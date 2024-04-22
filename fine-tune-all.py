@@ -4,12 +4,15 @@ import numpy as np
 from datasets import load_dataset
 from transformers import T5Tokenizer, DataCollatorForSeq2Seq
 from transformers import T5ForConditionalGeneration, Seq2SeqTrainingArguments, Seq2SeqTrainer
+import torch
 
 # Load the tokenizer, model, and data collator
 MODEL_NAME = "google/flan-t5-base"
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
-model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
+model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME).to(device)
 data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
 
 # Acquire the training data from Hugging Face
@@ -27,12 +30,12 @@ def preprocess_function(examples):
    """Add prefix to the sentences, tokenize the text, and set the labels"""
    # The "inputs" are the tokenized answer:
    inputs = [prefix + doc for doc in examples["question"]]
-   model_inputs = tokenizer(inputs, max_length=128, truncation=True)
+   model_inputs = tokenizer(inputs, max_length=128, truncation=True).to(device)
   
    # The "labels" are the tokenized outputs:
    labels = tokenizer(text_target=examples["answer"], 
                       max_length=512,         
-                      truncation=True)
+                      truncation=True).to(device)
 
    model_inputs["labels"] = labels["input_ids"]
    return model_inputs
@@ -97,13 +100,13 @@ trainer.train()
 
 last_checkpoint = "./results/checkpoint-22500"
 
-finetuned_model = T5ForConditionalGeneration.from_pretrained(last_checkpoint)
+finetuned_model = T5ForConditionalGeneration.from_pretrained(last_checkpoint).to(device)
 tokenizer = T5Tokenizer.from_pretrained(last_checkpoint)
 
 my_question = "What do you think about the benefit of Artificial Intelligence?"
 inputs = "Please answer to this question: " + my_question
 
-inputs = tokenizer(inputs, return_tensors="pt")
+inputs = tokenizer(inputs, return_tensors="pt").to(device)
 outputs = finetuned_model.generate(**inputs)
 answer = tokenizer.decode(outputs[0])
 from textwrap import fill
