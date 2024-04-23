@@ -18,6 +18,8 @@ class T5FineTuner(nn.Module):
             nn.ReLU(),
             nn.Linear(8000, 32128)
         )
+        for param in self.linear_relu_stack.parameters():
+            param.requires_grad = True
     def forward(self, input_ids, attention_mask=None, decoder_input_ids=None, decoder_attention_mask=None, labels=None):
         outputs = self.t5model(
             input_ids,
@@ -25,9 +27,11 @@ class T5FineTuner(nn.Module):
             decoder_input_ids=decoder_input_ids,
             decoder_attention_mask=decoder_attention_mask,
             labels=labels
-        )
-        logits = self.linear_relu_stack(outputs.logits)
-        return logits
+        ) 
+        res = outputs  # Get the logits directly from the T5 model
+        res.logits = self.linear_relu_stack(outputs.logits)  # Apply linear layers to logits
+
+        return res
 
 tokenizer = T5Tokenizer.from_pretrained('google/flan-t5-base')
 model = T5FineTuner().to('cuda')
@@ -46,24 +50,16 @@ optimizer = Adam(model.linear_relu_stack.parameters(), lr=1e-4)
 # Example pseudo-training loop
 for epoch in range(num_epochs):
     for batch in data_loader:
-        inputs = batch
-        labels = batch
-        print('inputs : ', inputs.shape)
+        inputs = batch.to('cuda')
+        labels = batch.to('cuda')
         optimizer.zero_grad()
-        outputs = model(inputs.to('cuda'), labels = batch.to('cuda'))
-        print('output : ', outputs.shape)
-        print('labels : ', labels.shape)
-        #loss = loss_fn(outputs, labels)
-        mask = (labels != tokenizer.pad_token_id).float().to('cuda')
-        labels = F.one_hot(labels, num_classes=32128).to('cuda').float()
-        #loss = F.cross_entropy(outputs, labels, reduction = 'none')
-        loss = [F.cross_entropy(output, label, reduction = 'none') for output, label in zip(outputs, labels)]
-        loss = torch.stack(loss).to('cuda')
-        print('loss : ', loss.shape)
-        print('mask : ', mask.shape)
-        masked_loss = (loss * mask).mean(dim=1)
-        masked_loss.backward()
+        outputs = model(inputs, labels=labels)
+        
+        loss = outputs.loss
+        
+        loss.backward()
         optimizer.step()
+        optimizer.zero_grad()
 
 
 input_text = "What is bittensor?"
