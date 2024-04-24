@@ -1,4 +1,4 @@
-import torch
+from torch.autograd import Variable
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 from transformers import TextDataset
@@ -27,10 +27,10 @@ class T5FineTuner(nn.Module):
             decoder_input_ids=decoder_input_ids,
             decoder_attention_mask=decoder_attention_mask,
             labels=labels
-        ) 
+        )
         res = outputs  # Get the logits directly from the T5 model
-        res.logits = self.linear_relu_stack(outputs.logits)  # Apply linear layers to logits
-
+        #res.logits = self.linear_relu_stack(outputs.logits)  # Apply linear layers to logits
+        res.logits = Variable(outputs.logits, requires_grad = True)
         return res
 
 tokenizer = T5Tokenizer.from_pretrained('google/flan-t5-base')
@@ -46,6 +46,8 @@ from torch.optim import Adam
 
 # Create an optimizer with only the new parameters
 optimizer = Adam(model.linear_relu_stack.parameters(), lr=1e-4)
+print(model.parameters())
+print('---------------------')
 
 # Example pseudo-training loop
 for epoch in range(num_epochs):
@@ -57,6 +59,7 @@ for epoch in range(num_epochs):
         
         loss = outputs.loss
         
+        loss.requires_grad = True
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
@@ -66,7 +69,13 @@ input_text = "What is bittensor?"
 # Encode the input text to tensor
 input_ids = tokenizer.encode(input_text, return_tensors='pt').to('cuda')
 # Generate text using the model. Adjust the max_length as needed.
-output_ids = model.generate(input_ids, max_length=100, num_beams=5, early_stopping=True)
+#output_ids = model.generate(input_ids, max_length=100, num_beams=5, early_stopping=True)
+outputs = model(input_ids, labels = input_ids)
+softmax = nn.Softmax(dim=2)
+probabilities = softmax(outputs)
+print(probabilities)
+#output_ids = 
+
 
 # Decode the generated ids to text
 generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
