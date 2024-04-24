@@ -6,31 +6,19 @@ from transformers import TextDataset
 from transformers import T5ForConditionalGeneration, T5Tokenizer, DataCollatorForLanguageModeling, Trainer, TrainingArguments
 import torch.nn.functional as F
 
-class T5FineTuner(nn.Module):
-    def __init__(self):
-        super(T5FineTuner, self).__init__()
-        self.t5model = T5ForConditionalGeneration.from_pretrained('google/flan-t5-base').to('cuda')
-        for param in self.t5model.parameters():
-            param.requires_grad = False
-        # Calculate the total number of layers in the model
-        total_layers = len(self.t5model.decoder.block)
+model = T5ForConditionalGeneration.from_pretrained('google/flan-t5-base').to('cuda')
+for param in model.parameters():
+    param.requires_grad = True
+# Calculate the total number of layers in the model
+total_layers = len(model.decoder.block)
 
-        # Calculate the index of the layer to start unfreezing from (about one-third from the back)
-        start_index = total_layers - (total_layers // 3)
-        for layer in self.t5model.decoder.block[start_index:]:
-            for param in layer.parameters():
-                param.requires_grad = False
-    def forward(self, input_ids, attention_mask=None, decoder_input_ids=None, decoder_attention_mask=None, labels=None):
-        return self.t5model(
-            input_ids,
-            attention_mask=attention_mask,
-            decoder_input_ids=decoder_input_ids,
-            decoder_attention_mask=decoder_attention_mask,
-            labels=labels
-        )
+# Calculate the index of the layer to start unfreezing from (about one-third from the back)
+start_index = total_layers - (total_layers // 3)
+for layer in model.decoder.block[start_index:]:
+    for param in layer.parameters():
+        param.requires_grad = True
 
 tokenizer = T5Tokenizer.from_pretrained('google/flan-t5-base')
-model = T5FineTuner().to('cuda')
 
 class MyDataset(Dataset):
     def __init__(self, file_path, tokenizer, max_length=512):
@@ -52,7 +40,7 @@ class MyDataset(Dataset):
 
 train_path = 'bittensor.txt'
 train_dataset = MyDataset(tokenizer=tokenizer, file_path=train_path)
-num_epochs = 5
+num_epochs = 50
 data_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
 loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 #print(train_dataset.examples)
@@ -65,7 +53,7 @@ print('---------------------')
 
 # Example pseudo-training loop
 for epoch in range(num_epochs):
-    print(f'-------------------------{epoch}-------------------------')
+    print(f'-------------------------Epoch {epoch}-------------------------')
     for batch in data_loader:
         input_ids = batch['input_ids']
         attention_mask = batch['attention_mask']
@@ -75,9 +63,9 @@ for epoch in range(num_epochs):
         attention_mask = attention_mask.reshape(originshape[0], originshape[2])
         labels = labels.reshape(originshape[0], originshape[2])
         optimizer.zero_grad()
-        print(f'inputs shape : {input_ids.shape}')
-        print(f'inputs : {input_ids}')
-        print(f'labels shape : {labels.shape}')
+        #print(f'inputs shape : {input_ids.shape}')
+        #print(f'inputs : {input_ids}')
+        #print(f'labels shape : {labels.shape}')
         outputs = model(input_ids, attention_mask = attention_mask, labels=labels)
         
         loss = outputs.loss
@@ -87,10 +75,16 @@ for epoch in range(num_epochs):
         optimizer.step()
         optimizer.zero_grad()
 
+
+
+    input_text = "What is bittensor?"
+    # Encode the input text to tensor
+    input_ids = tokenizer.encode(input_text, return_tensors='pt').to('cuda')
+
+    outputs = model.generate(input_ids, max_length = 100)
+    print(tokenizer.decode(outputs[0], skip_special_tokens = True))
+
         
-input_text = "What is apple?"
-# Encode the input text to tensor
-input_ids = tokenizer.encode(input_text, return_tensors='pt').to('cuda')
 """
 
 # Generate text using the model. Adjust the max_length as needed.
@@ -108,6 +102,7 @@ generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
 print("Input Text:", input_text)
 print("Generated Text:", generated_text)
+"""
 """
 outputs = input_ids
 max_length = 100  # Define the maximum length of the sequence
@@ -140,3 +135,4 @@ with torch.no_grad():
 print(decoder_input_ids[0])
 generated_text = tokenizer.decode(decoder_input_ids[0], skip_special_tokens=True)
 print(generated_text)
+"""
