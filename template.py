@@ -7,7 +7,7 @@ model = T5ForConditionalGeneration.from_pretrained(model_name).to('cuda')
 
 # Calculate the total number of layers in the model
 total_layers = len(model.decoder.block)
-
+"""
 for param in model.parameters():
     param.requires_grad = False
 # Calculate the index of the layer to start unfreezing from (about one-third from the back)
@@ -15,7 +15,7 @@ start_index = total_layers - (total_layers // 3)
 for layer in model.decoder.block[start_index:]:
     for param in layer.parameters():
         param.requires_grad = True
-
+"""
 from transformers import LineByLineTextDataset, DataCollatorForLanguageModeling, Seq2SeqTrainer, Seq2SeqTrainingArguments
 
 # Load unlabeled data and tokenize it
@@ -32,7 +32,7 @@ BATCH_SIZE = 8
 PER_DEVICE_EVAL_BATCH = 4
 WEIGHT_DECAY = 0.01
 SAVE_TOTAL_LIM = 3
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 300
 
 # Set up training arguments
 training_args = Seq2SeqTrainingArguments(
