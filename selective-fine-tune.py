@@ -19,19 +19,15 @@ class T5FineTuner(nn.Module):
         start_index = total_layers - (total_layers // 3)
         for layer in self.t5model.decoder.block[start_index:]:
             for param in layer.parameters():
-                param.requires_grad = True
+                param.requires_grad = False
     def forward(self, input_ids, attention_mask=None, decoder_input_ids=None, decoder_attention_mask=None, labels=None):
-        outputs = self.t5model(
+        return self.t5model(
             input_ids,
             attention_mask=attention_mask,
             decoder_input_ids=decoder_input_ids,
             decoder_attention_mask=decoder_attention_mask,
             labels=labels
         )
-        res = outputs  # Get the logits directly from the T5 model
-        #res.logits = self.linear_relu_stack(outputs.logits)  # Apply linear layers to logits
-        res.logits = Variable(outputs.logits, requires_grad = True)
-        return res
 
 tokenizer = T5Tokenizer.from_pretrained('google/flan-t5-base')
 model = T5FineTuner().to('cuda')
