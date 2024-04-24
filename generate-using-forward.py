@@ -1,15 +1,21 @@
 from transformers import T5Tokenizer, T5ForConditionalGeneration
+import torch
 
 tokenizer = T5Tokenizer.from_pretrained('google/flan-t5-base')
 model = T5ForConditionalGeneration.from_pretrained('google/flan-t5-base').to('cuda')
 
-inputs = 'What is apple?'
+inputs = 'Who is Steve Jobs?'
+
+input_ids = tokenizer.encode(inputs, return_tensors='pt').to('cuda')
+print(f"input_ids : {input_ids}")
+
+#outputs = model.generate(input_ids, max_length=100)
+outputs = model(input_ids, labels = input_ids).logits
+print(f"outputs : {outputs}")
+out = torch.argmax(outputs, dim=-1, keepdim=True)
+
+print(tokenizer.decode(out, skip_special_tokens=True))
 """
-input_ids = tokenizer.encode(inputs, return_tensors='pt')
-
-outputs = model.generate(input_ids, max_length=100)
-
-print(tokenizer.decode(outputs[0], skip_special_tokens=True))"""
 import torch
         
 input_text = "What is apple?"
@@ -47,3 +53,4 @@ with torch.no_grad():
 print(decoder_input_ids[0])
 generated_text = tokenizer.decode(decoder_input_ids[0], skip_special_tokens=True)
 print(generated_text)
+"""
