@@ -2,9 +2,9 @@ from transformers import T5ForConditionalGeneration, T5Tokenizer, TextDataset, D
 
 # Load the pre-trained GPT-2 model and tokenizer
 model_name = 'google/flan-t5-base'
-tokenizer = T5Tokenizer.from_pretrained(model_name, padding_side = 'left')
+tokenizer = T5Tokenizer.from_pretrained(model_name, padding_side = 'right')
 model = T5ForConditionalGeneration.from_pretrained(model_name).to('cuda')
-
+"""
 # Calculate the total number of layers in the model
 total_layers = len(model.decoder.block)
 
@@ -13,34 +13,37 @@ start_index = total_layers - (total_layers // 3)
 for layer in model.decoder.block[start_index:]:
     for param in layer.parameters():
         param.requires_grad = True
+"""
+from transformers import LineByLineTextDataset, DataCollatorForLanguageModeling, Trainer, TrainingArguments
 
-# Prepare the training data
-train_path = 'bittensor.txt'
-train_dataset = TextDataset(tokenizer=tokenizer, file_path=train_path, block_size=128)
-#print(train_dataset.examples)
+# Load unlabeled data and tokenize it
+#unlabeled_data = open('bittensor.txt', 'r').readlines()
+#tokenized_data = tokenizer(unlabeled_data, truncation=True, padding=True)
 
-# Define the training arguments
+# Create training dataset for MLM
+dataset = LineByLineTextDataset(tokenizer=tokenizer, file_path='bittensor.txt', block_size=128)
+data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False, mlm_probability=0.15)
+
+# Define training arguments
 training_args = TrainingArguments(
-    output_dir='./bittensor_finetuned',
+    output_dir='./results',
+    overwrite_output_dir=True,
     num_train_epochs=30,
     per_device_train_batch_size=4,
-    save_steps=500,
-    logging_steps=100,
-    overwrite_output_dir=True,
-    evaluation_strategy='steps',
-    eval_steps=500,
+    save_steps=10_000,
+    save_total_limit=2,
 )
 
-# Initialize the trainer
+# Create Trainer and train the model
 trainer = Trainer(
     model=model,
     args=training_args,
-    data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
-    train_dataset=train_dataset
+    data_collator=data_collator,
+    train_dataset=dataset,
 )
 
-# Start the fine-tuning
 trainer.train()
+
 
 input_text = "What is bittensor?"
 # Encode the input text to tensor
