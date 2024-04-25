@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 model = T5ForConditionalGeneration.from_pretrained('google/flan-t5-base').to('cuda')
 for param in model.parameters():
-    param.requires_grad = True
+    param.requires_grad = False
 # Calculate the total number of layers in the model
 total_layers = len(model.decoder.block)
 
@@ -30,6 +30,8 @@ class MyDataset(Dataset):
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self):
+        print(self.texts)
+        print(len(self.texts))
         return len(self.texts)
 
     def __getitem__(self, idx):
@@ -50,6 +52,7 @@ from torch.optim import Adam
 optimizer = Adam(model.parameters(), lr=1e-4)
 print(model.parameters())
 print('---------------------')
+import random
 
 # Example pseudo-training loop
 for epoch in range(num_epochs):
@@ -58,10 +61,16 @@ for epoch in range(num_epochs):
         input_ids = batch['input_ids']
         attention_mask = batch['attention_mask']
         labels = batch['input_ids']
+
         originshape = input_ids.shape
         input_ids = input_ids.reshape(originshape[0], originshape[2])
         attention_mask = attention_mask.reshape(originshape[0], originshape[2])
         labels = labels.reshape(originshape[0], originshape[2])
+
+        len = originshape[2]
+        mid = random.randrange(0, len)
+        attention_mask[:, mid:].zero_()
+
         optimizer.zero_grad()
         #print(f'inputs shape : {input_ids.shape}')
         #print(f'inputs : {input_ids}')
