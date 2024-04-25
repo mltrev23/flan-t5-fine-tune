@@ -30,8 +30,6 @@ class MyDataset(Dataset):
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def __len__(self):
-        print(self.texts)
-        print(len(self.texts))
         return len(self.texts)
 
     def __getitem__(self, idx):
@@ -42,7 +40,7 @@ class MyDataset(Dataset):
 
 train_path = 'bittensor.txt'
 train_dataset = MyDataset(tokenizer=tokenizer, file_path=train_path)
-num_epochs = 50
+num_epochs = 500
 data_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
 loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 #print(train_dataset.examples)
@@ -67,9 +65,12 @@ for epoch in range(num_epochs):
         attention_mask = attention_mask.reshape(originshape[0], originshape[2])
         labels = labels.reshape(originshape[0], originshape[2])
 
-        len = originshape[2]
-        mid = random.randrange(0, len)
+        length = attention_mask[0].sum().item()
+        mid = random.randrange(0, length)
         attention_mask[:, mid:].zero_()
+
+        #print(f'mid : {mid}')
+        #print(f'attention_mask : {attention_mask}')
 
         optimizer.zero_grad()
         #print(f'inputs shape : {input_ids.shape}')
