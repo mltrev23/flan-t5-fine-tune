@@ -13,8 +13,11 @@ for param in model.parameters():
 total_layers = len(model.decoder.block)
 
 # Calculate the index of the layer to start unfreezing from (about one-third from the back)
-start_index = total_layers - (total_layers // 3)
+start_index = total_layers - (total_layers // 6)
 for layer in model.decoder.block[start_index:]:
+    for param in layer.parameters():
+        param.requires_grad = True
+for layer in model.decoder.block[:start_index]:
     for param in layer.parameters():
         param.requires_grad = True
 
@@ -40,7 +43,7 @@ class MyDataset(Dataset):
 
 train_path = 'bittensor.txt'
 train_dataset = MyDataset(tokenizer=tokenizer, file_path=train_path)
-num_epochs = 500
+num_epochs = 1000
 data_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
 loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 #print(train_dataset.examples)
