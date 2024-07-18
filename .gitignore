@@ -161,3 +161,4 @@ cython_debug/
 
 results/
 bittensor_finetuned/
+*.exe
