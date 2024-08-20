@@ -6,22 +6,54 @@ from transformers import TextDataset
 from transformers import T5ForConditionalGeneration, T5Tokenizer, DataCollatorForLanguageModeling, Trainer, TrainingArguments
 import torch.nn.functional as F
 
-model = T5ForConditionalGeneration.from_pretrained('google/flan-t5-base').to('cuda')
-for param in model.parameters():
-    param.requires_grad = False
-# Calculate the total number of layers in the model
-total_layers = len(model.decoder.block)
-
-# Calculate the index of the layer to start unfreezing from (about one-third from the back)
-start_index = total_layers - (total_layers // 6)
-for layer in model.decoder.block[start_index:]:
-    for param in layer.parameters():
-        param.requires_grad = True
-for layer in model.decoder.block[:start_index]:
-    for param in layer.parameters():
-        param.requires_grad = True
+class T5FineTuner(nn.Module):
+    def __init__(self):
+        super(T5FineTuner, self).__init__()
+        self.t5model = T5ForConditionalGeneration.from_pretrained('google/flan-t5-base').to('cuda')
+        for param in self.t5model.parameters():
+            param.requires_grad = False
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(32128, 8000),
+            nn.ReLU(),
+            nn.Linear(8000, 8000),
+            nn.ReLU(),
+            nn.Linear(8000, 32128),
+            nn.ReLU(),
+            nn.Linear(32128, 8000),
+            nn.ReLU(),
+            nn.Linear(8000, 8000),
+            nn.ReLU(),
+            nn.Linear(8000, 32128),
+            nn.ReLU(),
+            nn.Linear(32128, 8000),
+            nn.ReLU(),
+            nn.Linear(8000, 8000),
+            nn.ReLU(),
+            nn.Linear(8000, 32128),
+            nn.ReLU(),
+            nn.Linear(32128, 8000),
+            nn.ReLU(),
+            nn.Linear(8000, 8000),
+            nn.ReLU(),
+            nn.Linear(8000, 32128),
+        )
+        for param in self.linear_relu_stack.parameters():
+            param.requires_grad = True
+    def forward(self, input_ids, attention_mask=None, decoder_input_ids=None, decoder_attention_mask=None, labels=None):
+        outputs = self.t5model(
+            input_ids,
+            attention_mask=attention_mask,
+            decoder_input_ids=decoder_input_ids,
+            decoder_attention_mask=decoder_attention_mask,
+            labels=labels
+        )
+        res = outputs  # Get the logits directly from the T5 model
+        #res.logits = self.linear_relu_stack(outputs.logits)  # Apply linear layers to logits
+        res.logits = Variable(outputs.logits, requires_grad = True)
+        return res
 
 tokenizer = T5Tokenizer.from_pretrained('google/flan-t5-base')
+model = T5FineTuner().to('cuda')
 
 class MyDataset(Dataset):
     def __init__(self, file_path, tokenizer, max_length=512):
@@ -41,63 +73,47 @@ class MyDataset(Dataset):
         return inputs
 
 
-train_path = 'bittensor.txt'
+train_path = 'datasets/bittensor.txt'
 train_dataset = MyDataset(tokenizer=tokenizer, file_path=train_path)
-num_epochs = 1000
+num_epochs = 5
 data_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
 loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 #print(train_dataset.examples)
 from torch.optim import Adam
 
 # Create an optimizer with only the new parameters
-optimizer = Adam(model.parameters(), lr=1e-4)
+optimizer = Adam(model.linear_relu_stack.parameters(), lr=1e-4)
 print(model.parameters())
 print('---------------------')
-import random
 
 # Example pseudo-training loop
 for epoch in range(num_epochs):
-    print(f'-------------------------Epoch {epoch}-------------------------')
+    print(f'-------------------------{epoch}-------------------------')
     for batch in data_loader:
         input_ids = batch['input_ids']
         attention_mask = batch['attention_mask']
         labels = batch['input_ids']
-
         originshape = input_ids.shape
         input_ids = input_ids.reshape(originshape[0], originshape[2])
         attention_mask = attention_mask.reshape(originshape[0], originshape[2])
         labels = labels.reshape(originshape[0], originshape[2])
-
-        length = attention_mask[0].sum().item()
-        mid = random.randrange(0, length)
-        attention_mask[:, mid:].zero_()
-
-        #print(f'mid : {mid}')
-        #print(f'attention_mask : {attention_mask}')
-
         optimizer.zero_grad()
-        #print(f'inputs shape : {input_ids.shape}')
-        #print(f'inputs : {input_ids}')
-        #print(f'labels shape : {labels.shape}')
+        print(f'inputs shape : {input_ids.shape}')
+        print(f'inputs : {input_ids}')
+        print(f'labels shape : {labels.shape}')
         outputs = model(input_ids, attention_mask = attention_mask, labels=labels)
         
         loss = outputs.loss
         
-        #loss.requires_grad = True
+        loss.requires_grad = True
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
 
-
-
-    input_text = "What is bittensor?"
-    # Encode the input text to tensor
-    input_ids = tokenizer.encode(input_text, return_tensors='pt').to('cuda')
-
-    outputs = model.generate(input_ids, max_length = 100)
-    print(tokenizer.decode(outputs[0], skip_special_tokens = True))
-
         
+input_text = "What is apple?"
+# Encode the input text to tensor
+input_ids = tokenizer.encode(input_text, return_tensors='pt').to('cuda')
 """
 
 # Generate text using the model. Adjust the max_length as needed.
@@ -115,7 +131,6 @@ generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
 print("Input Text:", input_text)
 print("Generated Text:", generated_text)
-"""
 """
 outputs = input_ids
 max_length = 100  # Define the maximum length of the sequence
@@ -148,4 +163,3 @@ with torch.no_grad():
 print(decoder_input_ids[0])
 generated_text = tokenizer.decode(decoder_input_ids[0], skip_special_tokens=True)
 print(generated_text)
-"""

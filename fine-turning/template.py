@@ -19,12 +19,12 @@ for layer in model.decoder.block[start_index:]:
 from transformers import LineByLineTextDataset, DataCollatorForLanguageModeling, Seq2SeqTrainer, Seq2SeqTrainingArguments
 
 # Load unlabeled data and tokenize it
-#unlabeled_data = open('bittensor.txt', 'r').readlines()
+#unlabeled_data = open('datasets/bittensor.txt', 'r').readlines()
 #tokenized_data = tokenizer(unlabeled_data, truncation=True, padding=True)
 
 # Create training dataset for MLM
 tokenizer.mask_token = tokenizer.eos_token
-dataset = LineByLineTextDataset(tokenizer=tokenizer, file_path='bittensor.txt', block_size=128)
+dataset = LineByLineTextDataset(tokenizer=tokenizer, file_path='datasets/bittensor.txt', block_size=128)
 data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=True, mlm_probability=0.5)
 # Global Parameters
 L_RATE = 3e-4
